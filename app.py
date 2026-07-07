@@ -4,6 +4,7 @@ from tempfile import NamedTemporaryFile
 import streamlit as st
 
 from config import settings
+from services.audio_meta import default_meeting_date
 from services.confluence import ConfluenceClient, build_storage_html
 from services.excel_export import build_excel_fields, fill_template
 from services.stt import transcribe_audio
@@ -27,12 +28,15 @@ if st.button("텍스트 변환 + 요약 실행", disabled=audio_file is None):
         with NamedTemporaryFile(delete=False, suffix=Path(audio_file.name).suffix) as tmp:
             tmp.write(audio_file.getvalue())
             tmp_path = tmp.name
+        recorded_date = default_meeting_date(tmp_path)
         with st.spinner("음성을 텍스트로 변환하는 중..."):
             st.session_state.transcript = transcribe_audio(tmp_path, settings.openai_api_key)
         with st.spinner("회의 내용을 요약하는 중..."):
             st.session_state.summary = summarize_meeting(
                 st.session_state.transcript, settings.anthropic_api_key, settings.anthropic_model
             )
+        if not st.session_state.summary.get("meeting_date"):
+            st.session_state.summary["meeting_date"] = recorded_date
         st.success("변환 및 요약이 완료되었습니다.")
 
 if st.session_state.transcript:
